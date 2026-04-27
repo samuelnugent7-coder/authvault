@@ -6,10 +6,24 @@ vault.db-wal
 *.pem
 *.key
 
-# Build outputs
-build/
-*.exe
-*.apk
+# Build intermediates (Flutter & Go cache)
+api/vendor/
+desktop/build/
+app/build/
+
+# Release binaries are tracked in releases/ — keep them
+# But ignore leftover build logs and local runtime files
+build/*.log
+build/*.log~
+build/vault.db
+build/vault.db-shm
+build/vault.db-wal
+build/config.json
+build/api-out.log
+build/api-err.log
+build/authvault-api.exe~
+build/flutter_build.log
+build/apk_build.log
 
 # Go
 api/vendor/
