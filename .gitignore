@@ -1,0 +1,48 @@
+# Secrets & runtime data
+config.json
+vault.db
+vault.db-shm
+vault.db-wal
+*.pem
+*.key
+
+# Build outputs
+build/
+*.exe
+*.apk
+
+# Go
+api/vendor/
+*.test
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/pubspec.lock
+**/*.g.dart
+**/*.freezed.dart
+**/build/
+**/.packages
+**/.pub-cache/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/app/google-services.json
+**/ios/Pods/
+**/ios/.symlinks/
+**/macos/Pods/
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugins.cmake
+
+# IDE
+.vscode/settings.json
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop/windows/flutter/generated_plugins.cmake
+desktop/windows/flutter/generated_plugin_registrant.cc
+desktop/windows/flutter/generated_plugin_registrant.h
