@@ -24,7 +24,12 @@ var (
 	LogFingerprintMismatchFn func(userID int64, username, ip, device, details string)
 )
 
-// JWT wraps a handler requiring a valid Bearer JWT signed with the given secret.
+// ValidateAPIKeyFn is wired up by main to avoid a circular import.
+// It receives the raw "av_..." key and returns the user info if valid.
+var ValidateAPIKeyFn func(rawKey string) (userID int64, username string, isAdmin bool, ok bool)
+
+// JWT wraps a handler requiring a valid Bearer JWT signed with the given secret,
+// OR a valid API key (prefix "av_") when ValidateAPIKeyFn is wired up.
 func JWT(secret string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		header := r.Header.Get("Authorization")
@@ -33,6 +38,30 @@ func JWT(secret string, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		tokenStr := strings.TrimPrefix(header, "Bearer ")
+
+		// ── API key path ─────────────────────────────────────────────────
+		if strings.HasPrefix(tokenStr, "av_") {
+			if ValidateAPIKeyFn == nil {
+				http.Error(w, `{"error":"api keys not initialised"}`, http.StatusUnauthorized)
+				return
+			}
+			uid, uname, admin, ok := ValidateAPIKeyFn(tokenStr)
+			if !ok {
+				http.Error(w, `{"error":"invalid or expired api key"}`, http.StatusUnauthorized)
+				return
+			}
+			// Inject synthetic claims so UserFromContext works as normal.
+			claims := jwt.MapClaims{
+				"uid":      float64(uid),
+				"username": uname,
+				"admin":    admin,
+			}
+			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+			next(w, r.WithContext(ctx))
+			return
+		}
+
+		// ── JWT path ──────────────────────────────────────────────────────
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid

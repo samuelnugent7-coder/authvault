@@ -164,6 +164,19 @@ func main() {
 	middleware.LogFingerprintMismatchFn = func(uid int64, uname, ip, device, details string) {
 		db.LogAudit(uid, uname, "fingerprint_mismatch", ip, device, details)
 	}
+	// Wire up API key validation so Bearer av_... tokens work on all JWT-protected routes
+	middleware.ValidateAPIKeyFn = func(rawKey string) (int64, string, bool, bool) {
+		uid, key, err := db.ValidateAPIKey(rawKey)
+		if err != nil || uid == 0 || key == nil {
+			return 0, "", false, false
+		}
+		// Look up username for the owner
+		u, uErr := db.GetUserByID(uid)
+		if uErr != nil || u == nil {
+			return uid, "", false, true
+		}
+		return uid, u.Username, u.IsAdmin, true
+	}
 
 	// Auth (no JWT required)
 	mux.HandleFunc("/api/v1/auth/login", handlers.Login)

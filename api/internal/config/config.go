@@ -33,6 +33,12 @@ type Config struct {
 	// S3 backup retry — max consecutive failures before admin alert (default 5)
 	BackupMaxRetries int `json:"backup_max_retries,omitempty"`
 
+	// S3 backup schedule — interval in hours between scheduled backups (default 12)
+	S3BackupIntervalHours int `json:"s3_backup_interval_hours,omitempty"`
+
+	// S3 retention — delete timestamped backup objects older than this many days (default 30, 0 = keep all)
+	S3RetentionDays int `json:"s3_retention_days,omitempty"`
+
 	// Duress / Decoy vault — second password returns sanitized view
 	DuressPasswordHash string `json:"duress_password_hash,omitempty"`
 	DuressArgonSalt    string `json:"duress_argon_salt,omitempty"`

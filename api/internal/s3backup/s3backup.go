@@ -120,14 +120,34 @@ func ensureBackupKey(cfg *appconfig.Config) ([]byte, error) {
 	return key, nil
 }
 
-// StartScheduler starts the 12-hour S3 backup loop and the retry worker.
+// defaultBackupIntervalHours is used when config.S3BackupIntervalHours is unset.
+const defaultBackupIntervalHours = 12
+
+// defaultRetentionDays — timestamped backup objects older than this are
+// pruned from S3 after each successful run.  Set config.S3RetentionDays to
+// override (0 = keep all).
+const defaultRetentionDays = 30
+
+// StartScheduler starts the scheduled S3 backup loop and the retry worker.
+// The retry worker fires every 15 minutes and executes at most ONE Run(),
+// then clears all queued items on success — this prevents the backup flood
+// that occurred when each queued item triggered its own full Run().
 func StartScheduler(ctx context.Context) {
 	cfg := appconfig.Get()
 	if !cfg.S3Enabled || cfg.S3Bucket == "" {
 		log.Println("[s3backup] S3 backup disabled; scheduler not started")
 		return
 	}
-	log.Println("[s3backup] scheduler started (interval: 12h encrypted with retry queue)")
+	intervalHours := cfg.S3BackupIntervalHours
+	if intervalHours <= 0 {
+		intervalHours = defaultBackupIntervalHours
+	}
+	retentionDays := cfg.S3RetentionDays
+	if retentionDays <= 0 {
+		retentionDays = defaultRetentionDays
+	}
+	log.Printf("[s3backup] scheduler started (interval: %dh, retry: 15m, retention: %d days)",
+		intervalHours, retentionDays)
 
 	// Main backup loop
 	go func() {
@@ -138,14 +158,18 @@ func StartScheduler(ctx context.Context) {
 		}
 		if err := Run(ctx); err != nil {
 			log.Printf("[s3backup] initial run: %v", err)
+		} else {
+			pruneOldBackups(ctx, retentionDays)
 		}
-		ticker := time.NewTicker(12 * time.Hour)
+		ticker := time.NewTicker(time.Duration(intervalHours) * time.Hour)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
 				if err := Run(ctx); err != nil {
 					log.Printf("[s3backup] scheduled run: %v", err)
+				} else {
+					pruneOldBackups(ctx, retentionDays)
 				}
 			case <-ctx.Done():
 				return
@@ -153,9 +177,11 @@ func StartScheduler(ctx context.Context) {
 		}
 	}()
 
-	// Retry queue worker � checks every 60 seconds
+	// Retry queue worker — fires every 15 minutes.
+	// Runs ONE backup attempt and clears all queued items on success so we
+	// never create more than one extra S3 object per 15-minute window.
 	go func() {
-		ticker := time.NewTicker(60 * time.Second)
+		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for {
 			select {
@@ -168,9 +194,11 @@ func StartScheduler(ctx context.Context) {
 	}()
 }
 
-// drainQueue retries all queued backup tasks whose next_retry_at <= now.
+// drainQueue fires a single Run() attempt and, on success, clears ALL ready
+// queued tasks.  This avoids the N-tasks × Run() = N new S3 objects problem
+// that caused 1300+ backups in two days.
 func drainQueue(ctx context.Context) {
-	tasks, err := db.PeekReadyTasks(10)
+	tasks, err := db.PeekReadyTasks(100)
 	if err != nil || len(tasks) == 0 {
 		return
 	}
@@ -181,23 +209,67 @@ func drainQueue(ctx context.Context) {
 		maxRetries = 5
 	}
 
-	for _, task := range tasks {
-		if runErr := Run(ctx); runErr == nil {
+	// Run exactly ONE backup attempt for the whole batch.
+	runErr := Run(ctx)
+	if runErr == nil {
+		// Success — clear every queued task
+		for _, task := range tasks {
 			db.DeleteQueuedTask(task.ID)
-			db.SetBackupState("last_s3_success", strconv.FormatInt(time.Now().Unix(), 10))
-			log.Printf("[s3backup] retry task=%d succeeded after %d attempt(s)", task.ID, task.AttemptCount+1)
-		} else {
-			newAttempt := task.AttemptCount + 1
-			nextDelay := db.BackoffSeconds(newAttempt)
-			nextRetry := time.Now().Unix() + nextDelay
-			db.UpdateQueuedTask(task.ID, nextRetry, runErr.Error(), newAttempt)
-			log.Printf("[s3backup] retry task=%d attempt=%d next_in=%ds error=%v",
-				task.ID, newAttempt, nextDelay, runErr)
+			log.Printf("[s3backup] retry task=%d cleared after successful run", task.ID)
+		}
+		db.SetBackupState("last_s3_success", strconv.FormatInt(time.Now().Unix(), 10))
+		return
+	}
 
-			if newAttempt >= maxRetries {
-				log.Printf("[s3backup] *** BACKUP ALERT ***: S3 backup has failed %d consecutive times. "+
-					"Last error: %v. Please verify S3 credentials and connectivity.", newAttempt, runErr)
+	// Failure — advance each task's backoff independently
+	for _, task := range tasks {
+		newAttempt := task.AttemptCount + 1
+		nextDelay := db.BackoffSeconds(newAttempt)
+		nextRetry := time.Now().Unix() + nextDelay
+		db.UpdateQueuedTask(task.ID, nextRetry, runErr.Error(), newAttempt)
+		log.Printf("[s3backup] retry task=%d attempt=%d next_in=%ds error=%v",
+			task.ID, newAttempt, nextDelay, runErr)
+		if newAttempt >= maxRetries {
+			log.Printf("[s3backup] *** BACKUP ALERT ***: S3 backup failed %d times in a row. "+
+				"Last error: %v. Check S3 credentials.", newAttempt, runErr)
+		}
+	}
+}
+
+// pruneOldBackups deletes timestamped S3 objects older than retentionDays from
+// the totp/ and safe/ prefixes.  The latest/ objects are never deleted.
+func pruneOldBackups(ctx context.Context, retentionDays int) {
+	cfg := appconfig.Get()
+	if retentionDays <= 0 {
+		return
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+	client := newClient(cfg)
+
+	for _, prefix := range []string{"totp/", "safe/"} {
+		out, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket: aws.String(cfg.S3Bucket),
+			Prefix: aws.String(prefix),
+		})
+		if err != nil {
+			log.Printf("[s3backup] prune list %s: %v", prefix, err)
+			continue
+		}
+		var deleted int
+		for _, obj := range out.Contents {
+			if obj.LastModified != nil && obj.LastModified.Before(cutoff) {
+				_, delErr := client.DeleteObject(ctx, &s3.DeleteObjectInput{
+					Bucket: aws.String(cfg.S3Bucket),
+					Key:    obj.Key,
+				})
+				if delErr == nil {
+					deleted++
+				}
 			}
+		}
+		if deleted > 0 {
+			log.Printf("[s3backup] pruned %d old objects from s3://%s/%s (older than %d days)",
+				deleted, cfg.S3Bucket, prefix, retentionDays)
 		}
 	}
 }
