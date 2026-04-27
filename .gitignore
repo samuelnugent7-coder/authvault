@@ -3,6 +3,9 @@ safe.xml
 Accounts.json
 accounts.json
 
+# Local agent context document
+AGENT_CONTEXT.md
+
 # Secrets & runtime data
 config.json
 vault.db
