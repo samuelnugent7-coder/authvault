@@ -1,3 +1,8 @@
+# Sensitive local data — NEVER commit these
+safe.xml
+Accounts.json
+accounts.json
+
 # Secrets & runtime data
 config.json
 vault.db
