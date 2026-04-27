@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"authvault/api/internal/db"
+	"authvault/api/internal/middleware"
 	"authvault/api/internal/models"
 )
 
@@ -35,6 +36,9 @@ func SecureNotes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"title required"}`, http.StatusBadRequest)
 			return
 		}
+		ownerID, ownerUsername, _ := middleware.UserFromContext(r)
+		n.OwnerID = ownerID
+		n.OwnerUsername = ownerUsername
 		id, err := db.InsertSecureNote(&n)
 		if err != nil {
 			http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
@@ -71,7 +75,14 @@ func SecureNoteByID(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 			return
 		}
+		uid, _, isAdmin := middleware.UserFromContext(r)
+		if !db.CanViewNote(id, n.OwnerID, uid, isAdmin) {
+			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+			return
+		}
 		n.Tags, _ = db.GetNoteTagNames(id)
+		n.Messages, _ = db.GetNoteMessages(id)
+		n.Permissions, _ = db.GetNotePermissions(id)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(n)
 
@@ -79,6 +90,17 @@ func SecureNoteByID(w http.ResponseWriter, r *http.Request) {
 		var n models.SecureNote
 		if err := json.NewDecoder(r.Body).Decode(&n); err != nil {
 			http.Error(w, `{"error":"invalid body"}`, http.StatusBadRequest)
+			return
+		}
+		// Permission check
+		existing, eErr := db.GetSecureNote(id)
+		if eErr != nil || existing == nil {
+			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+			return
+		}
+		uid, _, isAdmin := middleware.UserFromContext(r)
+		if !db.CanEditNote(id, existing.OwnerID, uid, isAdmin) {
+			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 			return
 		}
 		n.ID = id
@@ -96,8 +118,9 @@ func SecureNoteByID(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 			return
 		}
+		_, username, _ := middleware.UserFromContext(r)
 		// Soft delete to recycle bin
-		db.SoftDeleteNote(note, "")
+		db.SoftDeleteNote(note, username)
 		w.WriteHeader(http.StatusNoContent)
 
 	default:

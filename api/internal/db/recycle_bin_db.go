@@ -160,6 +160,30 @@ func RestoreFromRecycleBin(binID int64, username string) (*models.RecycleBinEntr
 			return nil, err
 		}
 		e.OriginalID = newID
+	case "totp":
+		var t models.TOTPEntry
+		if err := json.Unmarshal([]byte(jsonStr), &t); err != nil {
+			return nil, err
+		}
+		t.ID = 0
+		newID, err := InsertTOTP(&t)
+		if err != nil {
+			return nil, err
+		}
+		e.OriginalID = newID
+	case "folder":
+		var stub struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal([]byte(jsonStr), &stub); err != nil {
+			return nil, err
+		}
+		res, err := db.Exec(`INSERT INTO safe_folders(name) VALUES(?)`, stub.Name)
+		if err != nil {
+			return nil, err
+		}
+		newID, _ := res.LastInsertId()
+		e.OriginalID = newID
 	}
 
 	_, err = db.Exec(`DELETE FROM recycle_bin WHERE id=?`, binID)
@@ -183,4 +207,57 @@ func RecycleBinCount() int {
 	var n int
 	db.QueryRow(`SELECT COUNT(*) FROM recycle_bin WHERE expires_at > ?`, time.Now().Unix()).Scan(&n)
 	return n
+}
+
+// SoftDeleteTOTP moves a TOTP entry into the recycle bin.
+func SoftDeleteTOTP(e *models.TOTPEntry, deletedBy string) error {
+	data, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	dataEnc, err := crypto.Encrypt(string(data))
+	if err != nil {
+		return err
+	}
+	nameEnc, err := crypto.Encrypt(e.Name)
+	if err != nil {
+		return err
+	}
+	exp := time.Now().Add(30 * 24 * time.Hour).Unix()
+	_, err = db.Exec(
+		`INSERT INTO recycle_bin(item_type,original_id,folder_id,name_enc,data_enc,deleted_by,expires_at)
+		 VALUES('totp',?,0,?,?,?,?)`,
+		e.ID, nameEnc, dataEnc, deletedBy, exp,
+	)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`DELETE FROM totp_entries WHERE id=?`, e.ID)
+	return err
+}
+
+// SoftDeleteFolder serialises the folder name and moves it to the recycle bin.
+// Its child records should already be individually soft-deleted by the caller.
+func SoftDeleteFolder(folderID int64, folderName, deletedBy string) error {
+	stub := map[string]interface{}{"id": folderID, "name": folderName}
+	data, _ := json.Marshal(stub)
+	dataEnc, err := crypto.Encrypt(string(data))
+	if err != nil {
+		return err
+	}
+	nameEnc, err := crypto.Encrypt(folderName)
+	if err != nil {
+		return err
+	}
+	exp := time.Now().Add(30 * 24 * time.Hour).Unix()
+	_, err = db.Exec(
+		`INSERT INTO recycle_bin(item_type,original_id,folder_id,name_enc,data_enc,deleted_by,expires_at)
+		 VALUES('folder',?,?,?,?,?,?)`,
+		folderID, folderID, nameEnc, dataEnc, deletedBy, exp,
+	)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`DELETE FROM safe_folders WHERE id=?`, folderID)
+	return err
 }

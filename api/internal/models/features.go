@@ -119,12 +119,37 @@ type PasswordHistoryEntry struct {
 // ── Secure Notes ──────────────────────────────────────────────────────────────
 
 type SecureNote struct {
-	ID        int64    `json:"id"`
-	Title     string   `json:"title"`
-	Content   string   `json:"content"`
-	Tags      []string `json:"tags,omitempty"`
-	CreatedAt int64    `json:"created_at"`
-	UpdatedAt int64    `json:"updated_at"`
+	ID             int64           `json:"id"`
+	Title          string          `json:"title"`
+	Content        string          `json:"content,omitempty"` // legacy single-body field; new notes use Messages
+	Tags           []string        `json:"tags,omitempty"`
+	OwnerID        int64           `json:"owner_id,omitempty"`
+	OwnerUsername  string          `json:"owner_username,omitempty"`
+	Messages       []NoteMessage   `json:"messages,omitempty"`
+	Permissions    []NotePermission `json:"permissions,omitempty"`
+	CreatedAt      int64           `json:"created_at"`
+	UpdatedAt      int64           `json:"updated_at"`
+}
+
+// NoteMessage is one entry in a note's chat thread.
+type NoteMessage struct {
+	ID             int64  `json:"id"`
+	NoteID         int64  `json:"note_id"`
+	AuthorID       int64  `json:"author_id"`
+	AuthorUsername string `json:"author_username"`
+	Content        string `json:"content"` // decrypted on read
+	CreatedAt      int64  `json:"created_at"`
+	EditedAt       int64  `json:"edited_at,omitempty"`
+}
+
+// NotePermission grants a specific user access to a note.
+type NotePermission struct {
+	NoteID    int64  `json:"note_id"`
+	UserID    int64  `json:"user_id"`
+	Username  string `json:"username"`
+	Role      string `json:"role"` // "viewer" | "editor"
+	GrantedBy string `json:"granted_by"`
+	GrantedAt int64  `json:"granted_at"`
 }
 
 // ── Tags / Labels ─────────────────────────────────────────────────────────────
@@ -172,6 +197,8 @@ type ShareLink struct {
 	UsedAt    int64  `json:"used_at"`
 	CreatedBy string `json:"created_by"`
 	CreatedAt int64  `json:"created_at"`
+	ShareURL  string `json:"share_url,omitempty"` // S3 public URL (empty if S3 not configured)
+	S3Key     string `json:"s3_key,omitempty"`   // object key in S3 bucket
 }
 
 // ── Record Versions ───────────────────────────────────────────────────────────

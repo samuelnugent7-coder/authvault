@@ -3,14 +3,15 @@ package models
 // ------ TOTP ------
 
 type TOTPEntry struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Issuer    string `json:"issuer"`
-	Secret    string `json:"secret"`  // stored encrypted, returned decrypted to authed client
-	Duration  int    `json:"duration"` // seconds (default 30)
-	Length    int    `json:"length"`   // digits (default 6)
-	HashAlgo  int    `json:"hash_algo"` // 0=SHA1, 1=SHA256, 2=SHA512
-	CreatedAt int64  `json:"created_at"`
+	ID        int64    `json:"id"`
+	Name      string   `json:"name"`
+	Issuer    string   `json:"issuer"`
+	Secret    string   `json:"secret"`  // stored encrypted, returned decrypted to authed client
+	Duration  int      `json:"duration"` // seconds (default 30)
+	Length    int      `json:"length"`   // digits (default 6)
+	HashAlgo  int      `json:"hash_algo"` // 0=SHA1, 1=SHA256, 2=SHA512
+	Tags      []string `json:"tags,omitempty"`
+	CreatedAt int64    `json:"created_at"`
 }
 
 type TOTPImportEntry struct {

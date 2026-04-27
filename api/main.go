@@ -196,6 +196,10 @@ func main() {
 			handlers.GetTOTPQR(w, r)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/tags") {
+			if r.Method == http.MethodPut { handlers.TOTPTagsHandler(w, r) } else { methodNotAllowed(w) }
+			return
+		}
 		switch r.Method {
 		case http.MethodPut:    handlers.UpdateTOTP(w, r)
 		case http.MethodDelete: handlers.DeleteTOTP(w, r)
@@ -421,7 +425,29 @@ func main() {
 		default:              methodNotAllowed(w)
 		}
 	}))
+	// Note sub-resources (messages, permissions) — must come before generic /notes/
 	mux.HandleFunc("/api/v1/notes/", middleware.JWT(secret, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/messages") {
+			switch r.Method {
+			case http.MethodGet, http.MethodPost: handlers.NoteMessagesHandler(w, r)
+			default:                             methodNotAllowed(w)
+			}
+			return
+		}
+		if strings.Contains(r.URL.Path, "/messages/") {
+			switch r.Method {
+			case http.MethodPut, http.MethodDelete: handlers.NoteMessageByIDHandler(w, r)
+			default:                               methodNotAllowed(w)
+			}
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/permissions") {
+			switch r.Method {
+			case http.MethodGet, http.MethodPut: handlers.NotePermissionsHandler(w, r)
+			default:                            methodNotAllowed(w)
+			}
+			return
+		}
 		switch r.Method {
 		case http.MethodGet:    handlers.SecureNoteByID(w, r)
 		case http.MethodPut:    handlers.SecureNoteByID(w, r)

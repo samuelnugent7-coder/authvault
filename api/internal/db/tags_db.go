@@ -24,6 +24,11 @@ func MigrateTags() error {
 			tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
 			PRIMARY KEY (note_id, tag_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS totp_tags (
+			totp_id INTEGER NOT NULL REFERENCES totp_entries(id) ON DELETE CASCADE,
+			tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+			PRIMARY KEY (totp_id, tag_id)
+		)`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -149,4 +154,63 @@ func TagsCount() int {
 	var n int
 	db.QueryRow(`SELECT COUNT(*) FROM tags`).Scan(&n)
 	return n
+}
+
+// SetTOTPTags replaces the tag set for a TOTP entry.
+func SetTOTPTags(totpID int64, tagIDs []int64) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM totp_tags WHERE totp_id=?`, totpID); err != nil {
+		return err
+	}
+	for _, tid := range tagIDs {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO totp_tags(totp_id,tag_id) VALUES(?,?)`, totpID, tid); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GetTOTPTagNames returns tag names (with color) for a TOTP entry.
+func GetTOTPTagNames(totpID int64) ([]string, error) {
+	rows, err := db.Query(
+		`SELECT t.name FROM tags t
+		 JOIN totp_tags tt ON tt.tag_id=t.id WHERE tt.totp_id=?`, totpID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		rows.Scan(&n)
+		names = append(names, n)
+	}
+	return names, rows.Err()
+}
+
+// GetTagsForItems returns a map of itemID→[]tagName for a given table.
+// table is "record_tags"/"note_tags"/"totp_tags" and idCol is the join column name.
+func GetTagNamesForItem(table, idCol string, itemID int64) []string {
+	rows, _ := db.Query(
+		`SELECT t.name FROM tags t JOIN `+table+` jt ON jt.tag_id=t.id WHERE jt.`+idCol+`=?`, itemID)
+	if rows == nil {
+		return nil
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		rows.Scan(&n)
+		names = append(names, n)
+	}
+	return names
+}
+
+// GetTagsWithColors returns all tags as objects (for building colour chips in UI).
+func GetTagsWithColors() ([]models.Tag, error) {
+	return AllTags()
 }

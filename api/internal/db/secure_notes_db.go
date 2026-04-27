@@ -29,9 +29,16 @@ func InsertSecureNote(n *models.SecureNote) (int64, error) {
 		return 0, err
 	}
 	res, err := db.Exec(
-		`INSERT INTO secure_notes(title_enc,content_enc) VALUES(?,?)`,
-		titleEnc, contentEnc,
+		`INSERT INTO secure_notes(title_enc,content_enc,owner_id,owner_username) VALUES(?,?,?,?)`,
+		titleEnc, contentEnc, n.OwnerID, n.OwnerUsername,
 	)
+	if err != nil {
+		// Fallback for DBs without owner columns yet (run before migration)
+		res, err = db.Exec(
+			`INSERT INTO secure_notes(title_enc,content_enc) VALUES(?,?)`,
+			titleEnc, contentEnc,
+		)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -62,13 +69,18 @@ func DeleteSecureNote(id int64) error {
 func GetSecureNote(id int64) (*models.SecureNote, error) {
 	var n models.SecureNote
 	var te, ce string
-	err := db.QueryRow(`SELECT id,title_enc,content_enc,created_at,updated_at FROM secure_notes WHERE id=?`, id).
-		Scan(&n.ID, &te, &ce, &n.CreatedAt, &n.UpdatedAt)
+	err := db.QueryRow(`SELECT id,title_enc,content_enc,owner_id,owner_username,created_at,updated_at FROM secure_notes WHERE id=?`, id).
+		Scan(&n.ID, &te, &ce, &n.OwnerID, &n.OwnerUsername, &n.CreatedAt, &n.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, err
+		// fallback for old schema
+		err = db.QueryRow(`SELECT id,title_enc,content_enc,created_at,updated_at FROM secure_notes WHERE id=?`, id).
+			Scan(&n.ID, &te, &ce, &n.CreatedAt, &n.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
 	}
 	n.Title, _ = crypto.Decrypt(te)
 	n.Content, _ = crypto.Decrypt(ce)
@@ -76,16 +88,20 @@ func GetSecureNote(id int64) (*models.SecureNote, error) {
 }
 
 func AllSecureNotes() ([]models.SecureNote, error) {
-	rows, err := db.Query(`SELECT id,title_enc,content_enc,created_at,updated_at FROM secure_notes ORDER BY updated_at DESC`)
+	rows, err := db.Query(`SELECT id,title_enc,content_enc,COALESCE(owner_id,0),COALESCE(owner_username,''),created_at,updated_at FROM secure_notes ORDER BY updated_at DESC`)
 	if err != nil {
-		return nil, err
+		// Fallback if owner columns missing
+		rows, err = db.Query(`SELECT id,title_enc,content_enc,0,'',created_at,updated_at FROM secure_notes ORDER BY updated_at DESC`)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer rows.Close()
 	var list []models.SecureNote
 	for rows.Next() {
 		var n models.SecureNote
 		var te, ce string
-		if err := rows.Scan(&n.ID, &te, &ce, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &te, &ce, &n.OwnerID, &n.OwnerUsername, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, err
 		}
 		n.Title, _ = crypto.Decrypt(te)

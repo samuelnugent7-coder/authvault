@@ -304,3 +304,51 @@ func upload(ctx context.Context, client *s3.Client, bucket, key string, data []b
 	}
 	return nil
 }
+
+// UploadShareSnapshot uploads a JSON snapshot to S3 and returns a presigned
+// GET URL valid for ttl.  Returns "", "", nil when S3 is not configured.
+func UploadShareSnapshot(ctx context.Context, token string, jsonData []byte, ttl time.Duration) (s3Key, presignedURL string, err error) {
+	cfg := appconfig.Get()
+	if !cfg.S3Enabled || cfg.S3Bucket == "" {
+		return "", "", nil
+	}
+	client := newClient(cfg)
+	key := fmt.Sprintf("shares/%s.json", token)
+
+	// Upload the object (private)
+	if err := upload(ctx, client, cfg.S3Bucket, key, jsonData); err != nil {
+		return "", "", fmt.Errorf("upload share snapshot: %w", err)
+	}
+
+	// Generate a presigned GET URL
+	presigner := s3.NewPresignClient(client)
+	req, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(cfg.S3Bucket),
+		Key:    aws.String(key),
+	}, s3.WithPresignExpires(ttl))
+	if err != nil {
+		// Non-fatal: return key but no URL; caller can fall back to internal API URL
+		log.Printf("[s3backup] presign share snapshot %q: %v", key, err)
+		return key, "", nil
+	}
+	return key, req.URL, nil
+}
+
+// DeleteShareSnapshot removes a share snapshot object from S3.
+func DeleteShareSnapshot(ctx context.Context, s3Key string) {
+	if s3Key == "" {
+		return
+	}
+	cfg := appconfig.Get()
+	if !cfg.S3Enabled || cfg.S3Bucket == "" {
+		return
+	}
+	client := newClient(cfg)
+	_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(cfg.S3Bucket),
+		Key:    aws.String(s3Key),
+	})
+	if err != nil {
+		log.Printf("[s3backup] delete share snapshot %q: %v", s3Key, err)
+	}
+}

@@ -25,6 +25,10 @@ func ListTOTP(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []models.TOTPEntry{}
 	}
+	// Attach tags to each entry
+	for i, e := range list {
+		list[i].Tags, _ = db.GetTOTPTagNames(e.ID)
+	}
 	// Per-entry read filtering for non-admin users
 	uid, _, isAdmin := middleware.UserFromContext(r)
 	if !isAdmin {
@@ -62,6 +66,10 @@ func CreateTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	e.ID = id
+	if len(e.Tags) > 0 {
+		tagIDs := resolveTagIDs(e.Tags)
+		db.SetTOTPTags(id, tagIDs)
+	}
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, e)
 }
@@ -104,12 +112,17 @@ func DeleteTOTP(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	uid, _, isAdmin := middleware.UserFromContext(r)
+	uid, username, isAdmin := middleware.UserFromContext(r)
 	if !isAdmin && db.IsExplicitlyDenied(uid, fmt.Sprintf("totp:%d", id), "write") {
 		jsonError(w, "permission denied for this TOTP entry", http.StatusForbidden)
 		return
 	}
-	if err := db.DeleteTOTP(id); err != nil {
+	entry, err := db.GetTOTP(id)
+	if err != nil || entry == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err := db.SoftDeleteTOTP(entry, username); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

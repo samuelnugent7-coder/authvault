@@ -114,12 +114,13 @@ func DeleteFolder(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	uid, _, isAdmin := middleware.UserFromContext(r)
+	uid, username, isAdmin := middleware.UserFromContext(r)
 	if !isAdmin && db.IsExplicitlyDenied(uid, fmt.Sprintf("safe:folder:%d", id), "write") {
 		jsonError(w, "permission denied for this folder", http.StatusForbidden)
 		return
 	}
-	if err := db.DeleteFolder(id); err != nil {
+	folderName, _ := db.GetFolderName(id)
+	if err := db.SoftDeleteFolder(id, folderName, username); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

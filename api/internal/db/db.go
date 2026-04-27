@@ -70,6 +70,9 @@ func migrate() error {
 	if err := MigrateRecordVersions(); err != nil {
 		return err
 	}
+	if err := MigrateNoteThreads(); err != nil {
+		return err
+	}
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS totp_entries (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,6 +219,13 @@ func UpdateFolder(id int64, name string) error {
 func DeleteFolder(id int64) error {
 	_, err := db.Exec(`DELETE FROM safe_folders WHERE id=?`, id)
 	return err
+}
+
+// GetFolderName returns the name of a folder.
+func GetFolderName(id int64) (string, error) {
+	var name string
+	err := db.QueryRow(`SELECT name FROM safe_folders WHERE id=?`, id).Scan(&name)
+	return name, err
 }
 
 // GetFolderTree returns the full nested folder/record tree.

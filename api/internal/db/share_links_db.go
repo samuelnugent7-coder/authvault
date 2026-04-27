@@ -19,13 +19,22 @@ func MigrateShareLinks() error {
 		expires_at INTEGER NOT NULL,
 		used_at    INTEGER NOT NULL DEFAULT 0,
 		created_by TEXT    NOT NULL DEFAULT '',
-		created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+		created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+		share_url  TEXT    NOT NULL DEFAULT '',
+		s3_key     TEXT    NOT NULL DEFAULT ''
 	)`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Add columns if upgrading from older schema
+	db.Exec(`ALTER TABLE share_links ADD COLUMN share_url TEXT NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE share_links ADD COLUMN s3_key    TEXT NOT NULL DEFAULT ''`)
+	return nil
 }
 
-// CreateShareLink generates a one-time encrypted share link token.
-func CreateShareLink(recordID int64, oneTime bool, ttlSeconds int64, createdBy string) (*models.ShareLink, error) {
+// CreateShareLink generates a share link token and stores it.
+// shareURL and s3Key are populated when S3 is enabled (can be empty).
+func CreateShareLink(recordID int64, oneTime bool, ttlSeconds int64, createdBy, shareURL, s3Key string) (*models.ShareLink, error) {
 	raw := make([]byte, 24)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, fmt.Errorf("rand: %w", err)
@@ -37,8 +46,8 @@ func CreateShareLink(recordID int64, oneTime bool, ttlSeconds int64, createdBy s
 		oneTimeInt = 1
 	}
 	res, err := db.Exec(
-		`INSERT INTO share_links(token,record_id,one_time,expires_at,created_by) VALUES(?,?,?,?,?)`,
-		token, recordID, oneTimeInt, exp, createdBy,
+		`INSERT INTO share_links(token,record_id,one_time,expires_at,created_by,share_url,s3_key) VALUES(?,?,?,?,?,?,?)`,
+		token, recordID, oneTimeInt, exp, createdBy, shareURL, s3Key,
 	)
 	if err != nil {
 		return nil, err
@@ -52,6 +61,8 @@ func CreateShareLink(recordID int64, oneTime bool, ttlSeconds int64, createdBy s
 		ExpiresAt: exp,
 		CreatedBy: createdBy,
 		CreatedAt: time.Now().Unix(),
+		ShareURL:  shareURL,
+		S3Key:     s3Key,
 	}, nil
 }
 
@@ -86,7 +97,8 @@ func ConsumeShareLink(token string) (*models.ShareLink, error) {
 
 func ListShareLinks(createdBy string) ([]models.ShareLink, error) {
 	rows, err := db.Query(
-		`SELECT id,record_id,one_time,expires_at,used_at,created_by,created_at
+		`SELECT id,record_id,one_time,expires_at,used_at,created_by,created_at,
+		        COALESCE(share_url,''),COALESCE(s3_key,'')
 		 FROM share_links WHERE created_by=? ORDER BY created_at DESC`, createdBy)
 	if err != nil {
 		return nil, err
@@ -96,7 +108,7 @@ func ListShareLinks(createdBy string) ([]models.ShareLink, error) {
 	for rows.Next() {
 		var sl models.ShareLink
 		var ot, ua int
-		rows.Scan(&sl.ID, &sl.RecordID, &ot, &sl.ExpiresAt, &ua, &sl.CreatedBy, &sl.CreatedAt)
+		rows.Scan(&sl.ID, &sl.RecordID, &ot, &sl.ExpiresAt, &ua, &sl.CreatedBy, &sl.CreatedAt, &sl.ShareURL, &sl.S3Key)
 		sl.OneTime = ot == 1
 		sl.UsedAt = int64(ua)
 		list = append(list, sl)
@@ -107,4 +119,9 @@ func ListShareLinks(createdBy string) ([]models.ShareLink, error) {
 func DeleteShareLink(id int64, createdBy string) error {
 	_, err := db.Exec(`DELETE FROM share_links WHERE id=? AND created_by=?`, id, createdBy)
 	return err
+}
+
+// UpdateShareLinkS3 stores the final S3 key and presigned URL after upload.
+func UpdateShareLinkS3(id int64, s3Key, shareURL string) {
+	db.Exec(`UPDATE share_links SET s3_key=?,share_url=? WHERE id=?`, s3Key, shareURL, id)
 }
