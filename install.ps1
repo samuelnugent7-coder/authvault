@@ -1,6 +1,6 @@
 # AuthVault — Windows installer (PowerShell)
 # Usage (run as Administrator, or it installs to user profile):
-#   irm https://raw.githubusercontent.com/samuelnugent7-coder/authvault/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Nugent-Brothers-Enterprises/authvault/main/install.ps1 | iex
 # Or:
 #   .\install.ps1 [-InstallDir "C:\AuthVault"] [-Port 8443] [-NoService]
 
@@ -10,7 +10,7 @@ param(
     [switch]$NoService
 )
 
-$REPO = "samuelnugent7-coder/authvault"
+$REPO = "Nugent-Brothers-Enterprises/authvault"
 $ErrorActionPreference = "Stop"
 
 function Write-Info  { Write-Host "[authvault] $args" -ForegroundColor Cyan }

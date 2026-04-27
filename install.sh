@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # AuthVault — Linux installer
-# Usage:  curl -fsSL https://raw.githubusercontent.com/samuelnugent7-coder/authvault/main/install.sh | bash
+# Usage:  curl -fsSL https://raw.githubusercontent.com/Nugent-Brothers-Enterprises/authvault/main/install.sh | bash
 # Or:     bash install.sh [--dir /opt/authvault] [--port 8443] [--no-service]
 
 set -euo pipefail
 
-REPO="samuelnugent7-coder/authvault"
+REPO="Nugent-Brothers-Enterprises/authvault"
 INSTALL_DIR="/opt/authvault"
 PORT="8443"
 NO_SERVICE=false

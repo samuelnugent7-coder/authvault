@@ -1,10 +1,10 @@
-Ôªø# AuthVault
+# AuthVault
 
-> Self-hosted password manager + TOTP authenticator. Zero cloud, zero subscriptions ‚Äî runs on your own machine, accessible anywhere via [Tailscale](https://tailscale.com/).
+> Self-hosted password manager + TOTP authenticator. Zero cloud, zero subscriptions ó runs on your own machine, accessible anywhere via [Tailscale](https://tailscale.com/).
 
 <p align="center">
-  <a href="https://github.com/samuelnugent7-coder/authvault/releases/latest">
-    <img src="https://img.shields.io/github/v/release/samuelnugent7-coder/authvault?style=flat-square&label=latest" />
+  <a href="https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Nugent-Brothers-Enterprises/authvault?style=flat-square&label=latest" />
   </a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20Linux-blue?style=flat-square" />
   <img src="https://img.shields.io/badge/encryption-AES--256--GCM-green?style=flat-square" />
@@ -16,10 +16,10 @@
 
 | Platform | File | Notes |
 |----------|------|-------|
-| **Windows** (API server) | [authvault-api.exe](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/authvault-api.exe) | Runs the backend |
-| **Windows** (Desktop app) | [AuthVault-Windows.zip](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Windows.zip) | Flutter GUI |
-| **Android** | [AuthVault-Android.apk](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Android.apk) | Sideload or install direct |
-| **Linux** (API server) | [authvault-api-linux](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/authvault-api-linux) | amd64 binary |
+| **Windows** (API server) | [authvault-api.exe](https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest/download/authvault-api.exe) | Runs the backend |
+| **Windows** (Desktop app) | [AuthVault-Windows.zip](https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest/download/AuthVault-Windows.zip) | Flutter GUI |
+| **Android** | [AuthVault-Android.apk](https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest/download/AuthVault-Android.apk) | Sideload or install direct |
+| **Linux** (API server) | [authvault-api-linux](https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest/download/authvault-api-linux) | amd64 binary |
 
 ---
 
@@ -28,7 +28,7 @@
 ### Linux (one-liner)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/samuelnugent7-coder/authvault/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Nugent-Brothers-Enterprises/authvault/main/install.sh | bash
 ```
 
 This downloads the latest binary, installs it to `/opt/authvault`, and sets up a **systemd service** that auto-starts on boot.
@@ -41,7 +41,7 @@ bash install.sh --dir /usr/local/authvault --port 9443 --no-service
 ### Windows (PowerShell, run as Administrator)
 
 ```powershell
-irm https://raw.githubusercontent.com/samuelnugent7-coder/authvault/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Nugent-Brothers-Enterprises/authvault/main/install.ps1 | iex
 ```
 
 This installs the API to `C:\Program Files\AuthVault`, registers a Windows Service, and adds it to PATH. Supports [NSSM](https://nssm.cc/) if installed.
@@ -50,7 +50,7 @@ This installs the API to `C:\Program Files\AuthVault`, registers a Windows Servi
 
 ## Getting Started
 
-### Step 1 ‚Äî Run the API server
+### Step 1 ó Run the API server
 
 **First launch only** (sets up config, prints your client secret):
 
@@ -64,18 +64,18 @@ cd "C:\Program Files\AuthVault" && .\authvault-api.exe
 
 On first run it will:
 1. Generate `config.json` in the same folder
-2. Print your **client secret** ‚Äî copy this, you need it for the app
+2. Print your **client secret** ó copy this, you need it for the app
 3. Create `vault.db` (SQLite, AES-256-GCM encrypted)
 
-### Step 2 ‚Äî Install the app
+### Step 2 ó Install the app
 
-- **Windows:** Unzip [AuthVault-Windows.zip](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Windows.zip) and run `authvault_desktop.exe`
-- **Android:** Install [AuthVault-Android.apk](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Android.apk)
+- **Windows:** Unzip [AuthVault-Windows.zip](https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest/download/AuthVault-Windows.zip) and run `authvault_desktop.exe`
+- **Android:** Install [AuthVault-Android.apk](https://github.com/Nugent-Brothers-Enterprises/authvault/releases/latest/download/AuthVault-Android.apk)
 
-### Step 3 ‚Äî Connect the app
+### Step 3 ó Connect the app
 
-1. Open app ‚Üí tap **gear icon** (Settings)
-2. Set **API Server URL** ‚Üí `http://<server-ip>:8443`
+1. Open app ? tap **gear icon** (Settings)
+2. Set **API Server URL** ? `http://<server-ip>:8443`
 3. Paste your **client secret**
 4. Enter your **master password** and login
 
@@ -105,11 +105,11 @@ nssm start AuthVaultAPI
 
 | Layer | Mechanism |
 |-------|-----------|
-| Transport | Tailscale WireGuard ‚Äî no open ports needed |
+| Transport | Tailscale WireGuard ó no open ports needed |
 | API auth | JWT signed with HMAC-SHA256 secret |
 | Password verification | Argon2id (3 passes, 64 MB, 4 threads) |
 | Data at rest | AES-256-GCM, key derived from master password |
-| Session key | RAM only ‚Äî wiped on logout/restart |
+| Session key | RAM only ó wiped on logout/restart |
 
 > **The master password is never stored.** Only an Argon2id hash is saved.
 
@@ -138,11 +138,11 @@ nssm start AuthVaultAPI
 
 ## API Keys
 
-API keys let you access AuthVault from scripts, home-automation tools, or any HTTP client ‚Äî no session, no cookie, just a static secret.
+API keys let you access AuthVault from scripts, home-automation tools, or any HTTP client ó no session, no cookie, just a static secret.
 
 ### Create a key
 
-**In the app:** Settings ‚Üí API Keys ‚Üí **+** ‚Üí give it a name and optional expiry.
+**In the app:** Settings ? API Keys ? **+** ? give it a name and optional expiry.
 
 **Or via curl / any HTTP client:**
 ```bash
@@ -157,12 +157,12 @@ curl -sk -X POST https://<host>:8443/api/v1/api-keys \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"home-automation","expires_at":0}'
-# returns: {"key_full":"av_abc123..."}  ‚Üê save this, shown ONCE
+# returns: {"key_full":"av_abc123..."}  ? save this, shown ONCE
 ```
 
 ### Use a key
 
-Prefix the key with `Bearer ` in the `Authorization` header ‚Äî it works on **every endpoint** that normally requires a JWT:
+Prefix the key with `Bearer ` in the `Authorization` header ó it works on **every endpoint** that normally requires a JWT:
 
 ```bash
 API_KEY="av_abc123..."
@@ -208,14 +208,14 @@ curl -sk -X DELETE https://<host>:8443/api/v1/api-keys/3 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-> **Security tip:** API keys are stored as SHA-256 hashes ‚Äî the full key is shown **once** at creation. Treat it like a password.
+> **Security tip:** API keys are stored as SHA-256 hashes ó the full key is shown **once** at creation. Treat it like a password.
 
 ---
 
 ## S3 Backup
 
 The scheduler runs a full encrypted backup every **12 hours** (configurable via `s3_backup_interval_hours` in `config.json`).  
-Failed backups retry every **15 minutes** ‚Äî not every 60 seconds.  
+Failed backups retry every **15 minutes** ó not every 60 seconds.  
 Backups older than **30 days** are automatically pruned (`s3_retention_days` to override).
 
 ---
@@ -225,7 +225,7 @@ Backups older than **30 days** are automatically pruned (`s3_retention_days` to 
 **Requirements:** Go 1.22+, Flutter 3.22+, Android SDK, Visual Studio 2022 (Windows EXE)
 
 ```bash
-git clone https://github.com/samuelnugent7-coder/authvault.git
+git clone https://github.com/Nugent-Brothers-Enterprises/authvault.git
 cd authvault/api
 # Linux
 go build -ldflags="-s -w" -o ../build/authvault-api .
