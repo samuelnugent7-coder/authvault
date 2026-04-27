@@ -524,6 +524,24 @@ class ApiService {
   // ---- Backup Health ----
   Future<Map<String, dynamic>> getBackupHealth() => _get('/api/v1/backup/health');
 
+  /// Clears all stale S3 retry tasks. Returns {'cleared': N}.
+  Future<Map<String, dynamic>> clearBackupQueue() async {
+    final base = VaultManager.instance.getApiBase();
+    final token = await VaultManager.instance.getToken();
+    final client = VaultManager.instance.makeClient();
+    try {
+      final res = await client.delete(
+        Uri.parse('${base}/api/v1/backup/queue'),
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode >= 400) throw ApiException(res.statusCode, decoded['error'] ?? res.body);
+      return decoded;
+    } finally {
+      client.close();
+    }
+  }
+
   // ---- Helpers ----
 
   Future<Map<String, dynamic>> _get(String path) async {

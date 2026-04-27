@@ -297,6 +297,7 @@ func main() {
 	mux.HandleFunc("/api/v1/backup/files",   middleware.JWT(secret, handlers.BackupFiles))
 	mux.HandleFunc("/api/v1/backup/config",  middleware.JWT(secret, handlers.BackupConfig))
 	mux.HandleFunc("/api/v1/backup/health",  middleware.JWT(secret, handlers.BackupHealth))
+	mux.HandleFunc("/api/v1/backup/queue",   middleware.JWT(secret, handlers.ClearBackupQueue))
 
 	// Snapshots
 	mux.HandleFunc("/api/v1/snapshots", middleware.JWT(secret, func(w http.ResponseWriter, r *http.Request) {

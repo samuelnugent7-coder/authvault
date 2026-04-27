@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/api_service.dart';
 import '../../services/desktop_backup_service.dart';
 
 class BackupScreen extends StatefulWidget {
@@ -25,6 +26,10 @@ class _BackupScreenState extends State<BackupScreen> {
   DesktopBackupResult? _lastResult;
   Map<String, dynamic>? _persistedResult;
 
+  // S3 retry queue stats
+  Map<String, dynamic>? _s3Health;
+  bool _clearingQueue = false;
+
   final _scheduleOptions = const [
     (0, 'Manual only'),
     (6, 'Every 6 hours'),
@@ -46,6 +51,10 @@ class _BackupScreenState extends State<BackupScreen> {
       _cfg = cfg;
       _persistedResult = last;
     });
+    // Load S3 queue health in the background (non-critical)
+    ApiService().getBackupHealth().then((h) {
+      if (mounted) setState(() => _s3Health = h);
+    }).catchError((_) {});
     return cfg;
   }
 
@@ -187,6 +196,11 @@ class _BackupScreenState extends State<BackupScreen> {
                     ),
                   ],
                 ),
+                // S3 retry queue panel (shows only when there are queued tasks)
+                if (_s3Health != null && ((_s3Health!['queue_depth'] as int? ?? 0) > 0)) ...[
+                  const SizedBox(height: 16),
+                  _s3QueueCard(),
+                ],
               ],
             ),
           ),
@@ -436,6 +450,67 @@ class _BackupScreenState extends State<BackupScreen> {
         ),
       ),
     );
+  }
+
+  Widget _s3QueueCard() {
+    final depth = (_s3Health!['queue_depth'] as int? ?? 0);
+    final lastErr = (_s3Health!['last_error'] as String? ?? '');
+    return Card(
+      color: Theme.of(context).colorScheme.errorContainer.withAlpha(80),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('S3 Retry Queue: $depth task${depth == 1 ? '' : 's'} pending',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if (lastErr.isNotEmpty)
+                    Text(lastErr,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            _clearingQueue
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                : OutlinedButton.icon(
+                    onPressed: _clearS3Queue,
+                    icon: const Icon(Icons.delete_sweep, size: 18),
+                    label: const Text('Clear Queue'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.orange),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _clearS3Queue() async {
+    setState(() => _clearingQueue = true);
+    try {
+      final res = await ApiService().clearBackupQueue();
+      final n = res['cleared'] as int? ?? 0;
+      if (mounted) {
+        setState(() { _s3Health = null; _clearingQueue = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cleared $n stale S3 retry tasks.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _clearingQueue = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to clear queue: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _progressWidget() {

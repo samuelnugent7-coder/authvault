@@ -174,8 +174,9 @@ func GetNotePermissionForUser(noteID, userID int64) string {
 }
 
 // CanViewNote returns true if userID is the owner or has a viewer/editor grant.
+// Notes with ownerID == 0 are legacy/unowned notes — accessible to all logged-in users.
 func CanViewNote(noteID, ownerID, userID int64, isAdmin bool) bool {
-	if isAdmin || userID == ownerID {
+	if isAdmin || ownerID == 0 || userID == ownerID {
 		return true
 	}
 	role := GetNotePermissionForUser(noteID, userID)
@@ -183,8 +184,9 @@ func CanViewNote(noteID, ownerID, userID int64, isAdmin bool) bool {
 }
 
 // CanEditNote returns true if userID is the owner, has an editor grant, or is admin.
+// Notes with ownerID == 0 are legacy/unowned notes — editable by all logged-in users.
 func CanEditNote(noteID, ownerID, userID int64, isAdmin bool) bool {
-	if isAdmin || userID == ownerID {
+	if isAdmin || ownerID == 0 || userID == ownerID {
 		return true
 	}
 	return GetNotePermissionForUser(noteID, userID) == "editor"

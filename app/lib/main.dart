@@ -71,7 +71,7 @@ class _SplashState extends State<_Splash> {
       try {
         final api = context.read<ApiService>();
         serverOk = await api.isServerUnlocked()
-            .timeout(const Duration(seconds: 5));
+            .timeout(const Duration(seconds: 3));
       } catch (_) {
         serverOk = false;
       }
@@ -82,7 +82,7 @@ class _SplashState extends State<_Splash> {
         // Validate JWT and restore user info
         try {
           final api = context.read<ApiService>();
-          final me = await api.getMe().timeout(const Duration(seconds: 5));
+          final me = await api.getMe().timeout(const Duration(seconds: 3));
           if (me == null || me.username.isEmpty) {
             // Stale JWT — force re-login
             await VaultManager.instance.clearToken();

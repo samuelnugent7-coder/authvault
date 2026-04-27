@@ -163,56 +163,64 @@ class _MainScreenState extends State<MainScreen> {
                   const Divider(height: 1),
                   const SizedBox(height: 8),
 
-                  // Nav items
-                  for (var i = 0; i < navItems.length; i++)
-                    i == 7  // Settings (index 7) gets the sync badge
-                        ? ListenableBuilder(
-                            listenable: SyncService.instance,
-                            builder: (ctx, _) {
-                              final pending = SyncService.instance.pendingCount;
-                              return Stack(
-                                alignment: Alignment.centerRight,
-                                clipBehavior: Clip.none,
-                                children: [
-                                  _NavTile(
-                                    def: navItems[i],
-                                    selected: safeIndex == i,
-                                    onTap: () =>
-                                        setState(() => _selectedIndex = i),
-                                  ),
-                                  if (pending > 0)
-                                    Positioned(
-                                      right: 18,
-                                      top: 8,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        child: Text(
-                                          '$pending',
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          )
-                        : _NavTile(
-                            def: navItems[i],
-                            selected: safeIndex == i,
-                            onTap: () => setState(() => _selectedIndex = i),
-                          ),
+                  // Nav items — wrapped in scroll so they work on short windows
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < navItems.length; i++)
+                            i == 7  // Settings (index 7) gets the sync badge
+                                ? ListenableBuilder(
+                                    listenable: SyncService.instance,
+                                    builder: (ctx, _) {
+                                      final pending = SyncService.instance.pendingCount;
+                                      return Stack(
+                                        alignment: Alignment.centerRight,
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          _NavTile(
+                                            def: navItems[i],
+                                            selected: safeIndex == i,
+                                            onTap: () =>
+                                                setState(() => _selectedIndex = i),
+                                          ),
+                                          if (pending > 0)
+                                            Positioned(
+                                              right: 18,
+                                              top: 8,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  '$pending',
+                                                  style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  )
+                              : _NavTile(
+                                  def: navItems[i],
+                                  selected: safeIndex == i,
+                                  onTap: () => setState(() => _selectedIndex = i),
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-                  // Push lock button to the bottom
-                  const Spacer(),
+                  // Lock button — always visible at the bottom of the sidebar
                   const Divider(),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),

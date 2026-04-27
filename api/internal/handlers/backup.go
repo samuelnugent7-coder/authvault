@@ -429,3 +429,24 @@ func BackupHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, health)
 }
+
+// DELETE /api/v1/backup/queue  — admin only
+// Clears all stale retry tasks from the backup queue immediately.
+func ClearBackupQueue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	_, username, isAdmin := middleware.UserFromContext(r)
+	if !isAdmin {
+		jsonError(w, "admin only", http.StatusForbidden)
+		return
+	}
+	n, err := dbpkg.ClearBackupQueue()
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[backup] queue cleared by %s: %d tasks removed", username, n)
+	jsonOK(w, map[string]int64{"cleared": n})
+}

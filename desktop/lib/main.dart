@@ -106,12 +106,12 @@ class _AppRouterState extends State<AppRouter> {
         bool unlocked = false;
         try {
           unlocked = await ApiService().isServerUnlocked()
-              .timeout(const Duration(seconds: 5));
+              .timeout(const Duration(seconds: 3));
         } catch (_) {}
         if (unlocked && mounted) {
           try {
             final me = await ApiService().getMe()
-                .timeout(const Duration(seconds: 5));
+                .timeout(const Duration(seconds: 3));
             // If JWT is stale (no username claim), force re-login
             if (me == null || me.username.isEmpty) {
               await VaultManager.instance.clearToken();

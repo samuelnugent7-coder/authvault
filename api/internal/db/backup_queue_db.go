@@ -123,6 +123,17 @@ func GetLastQueueError() string {
 	return s
 }
 
+// ClearBackupQueue removes ALL entries from the retry queue.
+// Use this to flush a flood of stale failed tasks.
+func ClearBackupQueue() (int64, error) {
+	res, err := db.Exec(`DELETE FROM backup_queue`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
 // SetBackupState stores a key/value backup state entry (e.g. "last_success").
 func SetBackupState(key, value string) {
 	db.Exec(`INSERT INTO backup_state(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
