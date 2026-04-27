@@ -1,199 +1,161 @@
-# AuthVault
+﻿# AuthVault
 
-Self-hosted TOTP Authenticator + Password Safe, designed to run entirely on your Tailscale network.
+> Self-hosted password manager + TOTP authenticator. Zero cloud, zero subscriptions — runs on your own machine, accessible anywhere via [Tailscale](https://tailscale.com/).
 
-## Architecture
+<p align="center">
+  <a href="https://github.com/samuelnugent7-coder/authvault/releases/latest">
+    <img src="https://img.shields.io/github/v/release/samuelnugent7-coder/authvault?style=flat-square&label=latest" />
+  </a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20Linux-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/encryption-AES--256--GCM-green?style=flat-square" />
+</p>
 
+---
+
+## Download
+
+| Platform | File | Notes |
+|----------|------|-------|
+| **Windows** (API server) | [authvault-api.exe](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/authvault-api.exe) | Runs the backend |
+| **Windows** (Desktop app) | [AuthVault-Windows.zip](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Windows.zip) | Flutter GUI |
+| **Android** | [AuthVault-Android.apk](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Android.apk) | Sideload or install direct |
+| **Linux** (API server) | [authvault-api-linux](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/authvault-api-linux) | amd64 binary |
+
+---
+
+## Quick Install
+
+### Linux (one-liner)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/samuelnugent7-coder/authvault/main/install.sh | bash
 ```
-┌─────────────────────────────────────────────────────┐
-│  Flutter App (APK + Windows EXE)                    │
-│  ─ TOTP tab: live codes, QR scan (Android), copy   │
-│  ─ Safe tab: folder tree, records, custom fields   │
-│  ─ Settings: configurable API URL, import/export   │
-└──────────────────────┬──────────────────────────────┘
-                       │  HTTP + Bearer JWT (Tailscale)
-┌──────────────────────▼──────────────────────────────┐
-│  Go API Server  (authvault-api.exe / binary)        │
-│  ─ Auth: Argon2id password hash + JWT HS256        │
-│  ─ Storage: SQLite, all sensitive fields AES-256-GCM│
-│  ─ Runs on any Tailscale device (Windows or Linux) │
-└─────────────────────────────────────────────────────┘
+
+This downloads the latest binary, installs it to `/opt/authvault`, and sets up a **systemd service** that auto-starts on boot.
+
+Options:
+```bash
+bash install.sh --dir /usr/local/authvault --port 9443 --no-service
 ```
+
+### Windows (PowerShell, run as Administrator)
+
+```powershell
+irm https://raw.githubusercontent.com/samuelnugent7-coder/authvault/main/install.ps1 | iex
+```
+
+This installs the API to `C:\Program Files\AuthVault`, registers a Windows Service, and adds it to PATH. Supports [NSSM](https://nssm.cc/) if installed.
+
+---
+
+## Getting Started
+
+### Step 1 — Run the API server
+
+**First launch only** (sets up config, prints your client secret):
+
+```bash
+# Linux
+cd /opt/authvault && ./authvault-api
+
+# Windows
+cd "C:\Program Files\AuthVault" && .\authvault-api.exe
+```
+
+On first run it will:
+1. Generate `config.json` in the same folder
+2. Print your **client secret** — copy this, you need it for the app
+3. Create `vault.db` (SQLite, AES-256-GCM encrypted)
+
+### Step 2 — Install the app
+
+- **Windows:** Unzip [AuthVault-Windows.zip](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Windows.zip) and run `authvault_desktop.exe`
+- **Android:** Install [AuthVault-Android.apk](https://github.com/samuelnugent7-coder/authvault/releases/latest/download/AuthVault-Android.apk)
+
+### Step 3 — Connect the app
+
+1. Open app → tap **gear icon** (Settings)
+2. Set **API Server URL** → `http://<server-ip>:8443`
+3. Paste your **client secret**
+4. Enter your **master password** and login
+
+> Use [Tailscale](https://tailscale.com/) to reach your home server from anywhere without port forwarding.
+
+---
+
+## Running as a Service
+
+### Linux
+
+```bash
+sudo systemctl start authvault
+sudo journalctl -u authvault -f
+```
+
+### Windows (NSSM)
+
+```batch
+nssm install AuthVaultAPI "C:\Program Files\AuthVault\authvault-api.exe"
+nssm start AuthVaultAPI
+```
+
+---
 
 ## Security Model
 
 | Layer | Mechanism |
 |-------|-----------|
-| Transport | Tailscale (WireGuard) — no TLS needed |
-| API auth | JWT signed with HMAC-SHA256 client secret |
+| Transport | Tailscale WireGuard — no open ports needed |
+| API auth | JWT signed with HMAC-SHA256 secret |
 | Password verification | Argon2id (3 passes, 64 MB, 4 threads) |
 | Data at rest | AES-256-GCM, key derived from master password |
-| Session key | In-memory only, wiped on logout/restart |
+| Session key | RAM only — wiped on logout/restart |
 
-> **The master password is never stored.** The API stores only an Argon2id hash. The AES key is derived on login and lives only in RAM.
+> **The master password is never stored.** Only an Argon2id hash is saved.
 
 ---
 
-## Quick Start
+## Features
 
-### 1 — Build the API
+| Category | Feature |
+|----------|---------|
+| Auth | TOTP / 2FA codes, QR export |
+| Passwords | Folder tree, custom fields, password history |
+| Security | Recycle bin, record versions, duress/decoy vault |
+| Security | Data integrity check, session management |
+| Import | CSV (1Password / Bitwarden / LastPass), Accounts.json, safe.xml |
+| Notes | Encrypted secure notes |
+| Organisation | Tags with colour coding, shared folders |
+| Sharing | Time-limited share links, API keys |
+| Backup | Encrypted S3 backup, local snapshot system |
+| Alerts | Email alerts (SMTP / AWS SES) |
+| Admin | User management, expiry, audit log |
+| SSH | SSH key vault |
+| Dashboard | Vault health overview |
+| Generator | Configurable password generator |
 
-**Windows:**
-```batch
-cd api
-go mod tidy
-go build -ldflags="-s -w" -o ..\build\authvault-api.exe .
-```
+---
 
-**Linux (for a NAS/server):**
+## Build from Source
+
+**Requirements:** Go 1.22+, Flutter 3.22+, Android SDK, Visual Studio 2022 (Windows EXE)
+
 ```bash
-cd api && go mod tidy
-GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../build/authvault-api .
+git clone https://github.com/samuelnugent7-coder/authvault.git
+cd authvault/api
+# Linux
+go build -ldflags="-s -w" -o ../build/authvault-api .
+# Windows
+go build -ldflags="-s -w" -o ..\build\authvault-api.exe .
+
+# Flutter Windows
+cd ../desktop && flutter build windows --release
+# Flutter Android
+cd ../app && flutter build apk --release
 ```
-
-### 2 — First run (sets master password & generates client secret)
-
-```
-authvault-api.exe
-```
-
-On first launch it will:
-1. Print a **client secret** — copy this into the app's Settings screen
-2. Prompt you to **set a master password** via stdin
-3. Save `config.json` next to the executable
-
-`config.json` looks like:
-```json
-{
-  "port": "8443",
-  "data_dir": ".",
-  "client_secret": "xxxxxxxxxxxxxxxxxxxx",
-  "password_hash": "...",
-  "argon_salt": "..."
-}
-```
-
-Change `port` to whatever you like. The API always binds `0.0.0.0` — Tailscale controls who can reach it.
-
-### 3 — Run as a Windows service (optional)
-
-Use [NSSM](https://nssm.cc/):
-```batch
-nssm install AuthVaultAPI "C:\path\to\authvault-api.exe"
-nssm set AuthVaultAPI AppDirectory "C:\path\to\"
-nssm start AuthVaultAPI
-```
-
-### 4 — Build the Flutter app
-
-**Requirements:** Flutter 3.22+, Android SDK (for APK), Visual Studio 2022 (for EXE)
-
-```batch
-cd app
-flutter pub get
-
-# Windows EXE
-flutter build windows --release
-
-# Android APK  
-flutter build apk --release
-```
-
-Or run `build_windows.bat` for both in one step.
-
-### 5 — Configure the app
-
-1. Open the app → enter the **API Server URL** (your Tailscale IP + port, e.g. `http://100.x.x.x:8443`)
-2. Enter your **master password** to unlock
-3. Go to **Settings** → paste the **client secret** printed on first server run
 
 ---
 
-## API Endpoints
+## License
 
-All endpoints (except login/status) require `Authorization: Bearer <token>`.
-
-### Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v1/auth/login` | `{"password":"…"}` → `{"token":"…"}` |
-| `POST` | `/api/v1/auth/logout` | Wipes session key from memory |
-| `GET`  | `/api/v1/auth/status` | `{"unlocked": true/false}` |
-
-### TOTP
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`    | `/api/v1/totp` | List all entries (secrets decrypted) |
-| `POST`   | `/api/v1/totp` | Add entry |
-| `PUT`    | `/api/v1/totp/{id}` | Update entry |
-| `DELETE` | `/api/v1/totp/{id}` | Delete entry |
-| `POST`   | `/api/v1/totp/import` | Import `Accounts.json` format |
-| `GET`    | `/api/v1/totp/export` | Export `Accounts.json` format |
-
-### Password Safe
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`    | `/api/v1/safe` | Full folder/record tree |
-| `POST`   | `/api/v1/safe/folders` | Create folder |
-| `PUT`    | `/api/v1/safe/folders/{id}` | Rename folder |
-| `DELETE` | `/api/v1/safe/folders/{id}` | Delete folder (cascades) |
-| `POST`   | `/api/v1/safe/records` | Create record |
-| `PUT`    | `/api/v1/safe/records/{id}` | Update record |
-| `DELETE` | `/api/v1/safe/records/{id}` | Delete record |
-| `POST`   | `/api/v1/safe/items` | Add custom field |
-| `PUT`    | `/api/v1/safe/items/{id}` | Update custom field |
-| `DELETE` | `/api/v1/safe/items/{id}` | Delete custom field |
-| `POST`   | `/api/v1/safe/import` | Import `safe.xml` (`?replace=true` to wipe first) |
-| `GET`    | `/api/v1/safe/export` | Export `safe.xml` |
-
----
-
-## Import your existing data
-
-### TOTP (Accounts.json)
-In the app: **Settings → Import TOTP** → select your `Accounts.json` file.
-
-### Password Safe (safe.xml)
-In the app: **Settings → Import Safe** → select your `safe.xml` file.  
-Choose **Merge** to add alongside existing data, or **Replace** to wipe and replace.
-
----
-
-## Changing the API server IP
-
-Just edit the URL in the app's **Settings** screen. Nothing needs to change on the server — the JWT is signed with the client secret, not tied to an IP.
-
----
-
-## Project Structure
-
-```
-apps/auth/
-├── api/                    Go API server
-│   ├── main.go
-│   ├── go.mod
-│   └── internal/
-│       ├── config/         Config loading/saving
-│       ├── crypto/         AES-256-GCM + Argon2id
-│       ├── db/             SQLite operations
-│       ├── handlers/       HTTP route handlers
-│       ├── middleware/      JWT auth middleware
-│       └── models/         Shared data types
-├── app/                    Flutter app
-│   ├── pubspec.yaml
-│   └── lib/
-│       ├── main.dart
-│       ├── config/         Secure local settings
-│       ├── models/         TotpEntry, SafeFolder, etc.
-│       ├── services/       ApiService, TotpCalculator
-│       └── screens/
-│           ├── login_screen.dart
-│           ├── main_screen.dart
-│           ├── settings_screen.dart
-│           ├── totp/       TOTP list + add/scan
-│           └── safe/       Folder tree + record editor
-├── build_windows.bat       Build API + Windows EXE
-├── build_apk.sh            Build API + Android APK
-├── Accounts.json           Your TOTP data (import via app)
-└── safe.xml                Your safe data (import via app)
-```
+MIT
