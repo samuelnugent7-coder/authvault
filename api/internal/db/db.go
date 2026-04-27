@@ -108,14 +108,16 @@ func migrate() error {
 	if err := MigrateAttachments(); err != nil {
 		return err
 	}
-	// Add created_at to safe_records if it doesn't exist (idempotent)
-	db.Exec(`ALTER TABLE safe_records ADD COLUMN created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))`)
+	// Add created_at to safe_records if it doesn't exist (idempotent).
+	// NOTE: SQLite ALTER TABLE ADD COLUMN only accepts literal constant defaults,
+	// not expressions like strftime(). Use DEFAULT 0; queries use COALESCE(created_at,0).
+	db.Exec(`ALTER TABLE safe_records ADD COLUMN created_at INTEGER DEFAULT 0`)
 	// Add updated_at columns for incremental snapshot tracking (idempotent)
-	db.Exec(`ALTER TABLE totp_entries  ADD COLUMN updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))`)
-	db.Exec(`ALTER TABLE safe_folders  ADD COLUMN updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))`)
-	db.Exec(`ALTER TABLE safe_records  ADD COLUMN updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))`)
-	db.Exec(`ALTER TABLE safe_items    ADD COLUMN updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))`)
-	db.Exec(`ALTER TABLE ssh_keys      ADD COLUMN updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))`)
+	db.Exec(`ALTER TABLE totp_entries  ADD COLUMN updated_at INTEGER DEFAULT 0`)
+	db.Exec(`ALTER TABLE safe_folders  ADD COLUMN updated_at INTEGER DEFAULT 0`)
+	db.Exec(`ALTER TABLE safe_records  ADD COLUMN updated_at INTEGER DEFAULT 0`)
+	db.Exec(`ALTER TABLE safe_items    ADD COLUMN updated_at INTEGER DEFAULT 0`)
+	db.Exec(`ALTER TABLE ssh_keys      ADD COLUMN updated_at INTEGER DEFAULT 0`)
 	// Time-limited users
 	db.Exec(`ALTER TABLE users ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0`)
 	// Custom field types
